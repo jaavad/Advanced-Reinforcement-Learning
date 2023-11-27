@@ -1,0 +1,243 @@
+import numpy as np
+from BanditEnv import BanditEnv
+from agent import EpsilonGreedy, UCB
+from tqdm import trange
+import matplotlib.pyplot as plt
+
+def confidence_interval(rewards: np.ndarray, trials: int):
+    std_dev = np.std(rewards, axis = 0)
+    std_err = std_dev / (trials ** (1/2))
+    return 1.96 * std_err
+
+def q5(k: int, num_samples: int):
+    """Q5
+
+           multi-armed bandit env
+
+    Args:
+        k (int): Number of arms in bandit environment
+        num_samples (int): number of samples to take for each arm
+    """
+
+    env = BanditEnv(k=k)
+    env.reset()
+
+    rewards = [[env.step(j) for i in range(num_samples)] for j in range(k)]
+    plt.violinplot(rewards, showmeans=True, points = num_samples)
+    plt.xlabel("Action")
+    plt.ylabel("Reward Distribution")
+    plt.grid(axis='y')
+    plt.show()
+    pass
+
+
+def q6(k: int, trials: int, steps: int):
+    """Q6
+
+     epsilon greedy bandit agents with an initial estimate of 0
+
+    Args:
+        k (int): number of arms in bandit environment
+        trials (int): number of trials
+        steps (int): total number of steps for each trial
+    """
+    # initialize env and agents
+    env = BanditEnv(k=10)
+    agents = [EpsilonGreedy(k=10,init=0,epsilon=0),EpsilonGreedy(k=10,init=0,epsilon=0.01),EpsilonGreedy(k=10,init=0,epsilon=0.1)]
+    rewards = np.zeros((len(agents),trials,steps)) # collect every reward
+    optimal_actions = np.zeros((len(agents),steps)) # did agent conduct optimal action
+    best_possible_average = 0 # to plot the constant upper bound line
+    # Loop over trials
+    for t in trange(trials, desc="Trials"):
+        # Reset environment and agents after every trial
+        env.reset()
+        avg_rewards = env.means # to get optimal choices and best reward
+        optimal_action = np.argmax(env.means)
+        best_possible_average += max(avg_rewards) / trials
+        
+        for a in range(len(agents)):
+            agent = agents[a]
+            agent.reset()
+            
+            # For each trial, perform specified number of steps for each type of agent
+            for s in range(steps):
+                action = agent.choose_action()
+                
+                if action == optimal_action:
+                    optimal_actions[a,s] += 1
+                    
+                reward = env.step(action)
+                agent.update(action=action,reward=reward)
+                rewards[a,t,s] = reward
+    
+    # plot rewards
+    x = np.linspace(0, steps, num=steps)
+    # epsilon = 0
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[0,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[0], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='Epsilon = 0')
+    
+    # epsilon = 0.01
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[1,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[1], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='Epsilon = 0.01')
+    
+    # epsilon = 0.1
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[2,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[2], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='Epsilon = 0.1')
+    
+    
+    # plot best possible avg
+    plt.axhline(y=best_possible_average, dashes=[2, 1])
+    plt.xlabel("Steps")
+    plt.ylabel("Average Reward")
+    plt.legend()
+    plt.grid(axis='y')
+    plt.show()
+    
+    # plot % optimal
+    plt.clf()
+    plt.plot(optimal_actions[0] * 100 / trials, label='Epsilon = 0')
+    plt.plot(optimal_actions[1] * 100 / trials, label='Epsilon = 0.01')
+    plt.plot(optimal_actions[2] * 100 / trials, label='Epsilon = 0.1')
+    plt.xlabel("Steps")
+    plt.ylabel("% Optimal Action")
+    plt.legend()
+    plt.grid(axis='y')
+    plt.show()
+    pass
+
+
+def q7(k: int, trials: int, steps: int):
+    """Q7
+
+     epsilon greedy bandit agents and UCB agents
+
+    Args:
+        k (int): number of arms in bandit environment
+        trials (int): number of trials
+        steps (int): total number of steps for each trial
+    """
+    #  initialize env and agents here
+    env = BanditEnv(k=10)
+    agents = [EpsilonGreedy(k=10,init=0,epsilon=0,step_size=0.1),EpsilonGreedy(k=10,init=10,epsilon=0,step_size=0.1),EpsilonGreedy(k=10,init=0,epsilon=0.1,step_size=0.1)]
+    agents.append(EpsilonGreedy(k=10,init=10,epsilon=0.1,step_size=0.1))
+    agents.append(UCB(k=10,init=0,c=0.5,step_size=0.1))
+    rewards = np.zeros((len(agents),trials,steps)) # collect every reward
+    optimal_actions = np.zeros((len(agents),steps)) # did agent conduct optimal action
+    best_possible_average = 0 # to plot the constant upper bound line
+    # Loop over trials
+    for t in trange(trials, desc="Trials"):
+        # Reset environment and agents after every trial
+        env.reset()
+        avg_rewards = env.means # to get optimal choices and best reward
+        optimal_action = np.argmax(env.means)
+        best_possible_average += max(avg_rewards) / trials
+        
+        for a in range(len(agents)):
+            agent = agents[a]
+            agent.reset()
+            
+            # For each trial, perform specified number of steps for each type of agent
+            for s in range(steps):
+                action = agent.choose_action()
+                
+                if action == optimal_action:
+                    optimal_actions[a,s] += 1
+                    
+                reward = env.step(action)
+                agent.update(action=action,reward=reward)
+                rewards[a,t,s] = reward
+    
+    # plot rewards
+    x = np.linspace(0, steps, num=steps)
+    # epsilon = 0 and Q1 = 0
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[0,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[0], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='Q1 = 0, Epsilon = 0')
+    
+    # epsilon = 0 and Q1 = 5
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[1,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[1], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='Q1 = 5, Epsilon = 0')
+    
+    # epsilon = 0.1 and Q1 = 0
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[2,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[2], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='Q1 = 0, Epsilon = 0.1')
+    
+    # epsilon = 0.1 and Q1 = 5
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[3,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[2], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='Q1 = 5, Epsilon = 0.1')
+    
+    # UCB
+    agent_rewards = np.zeros(steps)
+    for t in range(trials):
+        agent_rewards += rewards[4,t]
+    agent_rewards /= t
+    interval = confidence_interval(rewards[2], trials)
+    plt.fill_between(x, y1 = agent_rewards - interval, y2 = agent_rewards + interval, alpha=0.5)
+    plt.plot(agent_rewards, label='UCB (c = 2)')
+    
+    # plot best possible avg
+    plt.axhline(y=best_possible_average, dashes=[2, 1])
+    plt.xlabel("Steps")
+    plt.ylabel("Average Reward")
+    plt.legend()
+    plt.grid(axis='y')
+    plt.show()
+    
+    # plot % optimal
+    plt.clf()
+    plt.plot(optimal_actions[0] * 100 / trials, label='Q1 = 0, Epsilon = 0')
+    plt.plot(optimal_actions[1] * 100 / trials, label='Q1 = 5, Epsilon = 0')
+    plt.plot(optimal_actions[2] * 100 / trials, label='Q1 = 0, Epsilon = 0.1')
+    plt.plot(optimal_actions[3] * 100 / trials, label='Q1 = 5, Epsilon = 0.1')
+    plt.plot(optimal_actions[4] * 100 / trials, label='UCB (c = 2)')
+    plt.xlabel("Steps")
+    plt.ylabel("% Optimal Action")
+    plt.legend()
+    plt.grid(axis='y')
+    plt.show()
+
+
+def main():
+    #run code for all questions
+    #q5(10,1000)
+    #q6(10,2000,1000)
+    q7(10,2000,1000)
+    pass
+
+
+if __name__ == "__main__":
+    main()
